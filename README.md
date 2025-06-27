@@ -1,2 +1,2 @@
 # wasp-plugins
-Plugins for WaspLib
+This repository holds plugins for [WaspLib](https://github.com/WaspScripts/WaspLib).
