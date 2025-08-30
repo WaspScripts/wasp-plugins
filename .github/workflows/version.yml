@@ -1,0 +1,94 @@
+name: Version Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  version:
+    if: ${{ github.repository_owner == 'WaspScripts' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+        with:
+          ref: main
+
+      - name: Set up Git
+        run: |
+          git config --global user.name "Wasp Bot"
+          git config --global user.email "waspbot@waspcripts.com"
+          
+      - name: Get current date
+        id: date
+        run: |
+          echo "CURRENT_YEAR=$(date +'%Y')" >> $GITHUB_ENV
+          echo "CURRENT_MONTH=$(date +'%m')" >> $GITHUB_ENV
+          echo "CURRENT_DAY=$(date +'%d')" >> $GITHUB_ENV
+
+      - name: Get commit hash
+        id: commit-hash
+        run: echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Update version.simba
+        run: |
+          sed -i "s/WL_PLUGINS_VERSION_YEAR: Integer = .*/WL_PLUGINS_VERSION_YEAR: Integer = $CURRENT_YEAR;/" version.simba
+          sed -i "s/WL_PLUGINS_VERSION_MONTH: Integer = .*/WL_PLUGINS_VERSION_MONTH: Integer = $CURRENT_MONTH;/" version.simba
+          sed -i "s/WL_PLUGINS_VERSION_DAY: Integer = .*/WL_PLUGINS_VERSION_DAY: Integer = $CURRENT_DAY;/" version.simba
+          sed -i "s/WL_PLUGINS_VERSION_COMMIT_HASH: String = .*/WL_PLUGINS_VERSION_COMMIT_HASH: String = '$COMMIT_HASH';/" version.simba
+
+      - name: Push changes
+        run: |
+          git add version.simba
+          git commit -m "Automatic version bump to $CURRENT_YEAR.$CURRENT_MONTH.$CURRENT_DAY-$COMMIT_HASH" || echo "No changes to commit on main"
+          git push
+          
+      - name: Create git tag
+        id: tag
+        run: |
+          TAG_NAME="$CURRENT_YEAR.$CURRENT_MONTH.$CURRENT_DAY-$COMMIT_HASH"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create $TAG_NAME --generate-notes
+          
+      - name: Discord notification
+        shell: bash
+        run: |
+            BODY=$(jq -nc \
+              --arg title "WaspLib Version $TAG_NAME" \
+              --arg desc "${{ github.event.workflow_run.head_commit.message }}\n\nDownload: https://github.com/WaspScripts/WaspLib/releases/tag/$TAG_NAME" \
+              --arg url  "https://github.com/WaspScripts/WaspLib/commit/${{ github.event.workflow_run.head_commit.id }}" \
+              --arg foot "Author: ${{ github.event.workflow_run.head_commit.author.name }}" \
+              --argjson color 16742912 \
+              '{embeds:[{title:$title,description:$desc,url:$url,color:$color,footer:{text:$foot}}]}')
+            curl \
+                -H "Content-Type: application/json" \
+                -d "$BODY" \
+                ${{ secrets.UPDATES_WEBHOOK }}
+      
+      - name: Create Uploaded Release
+        run: |
+          ZIP_NAME="$TAG_NAME.zip"
+          git archive --format zip --output "$ZIP_NAME" HEAD
+          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+          
+      - name: Upload release to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          curl -X POST "$SUPABASE_URL/storage/v1/object/plugins/$ZIP_NAME" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/zip" \
+            --data-binary @"$ZIP_NAME"
+          curl -X PUT "$SUPABASE_URL/storage/v1/object/plugins/latest.zip" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/zip" \
+            --data-binary @"$ZIP_NAME"
