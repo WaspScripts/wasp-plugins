@@ -1,8 +1,8 @@
 const
   WL_PLUGINS_VERSION_YEAR: Integer = 2025;
-  WL_PLUGINS_VERSION_MONTH: Integer = 01;
-  WL_PLUGINS_VERSION_DAY: Integer = 1;
-  WL_PLUGINS_VERSION_COMMIT_HASH: String = 'aaaaaaa';
+  WL_PLUGINS_VERSION_MONTH: Integer = 08;
+  WL_PLUGINS_VERSION_DAY: Integer = 30;
+  WL_PLUGINS_VERSION_COMMIT_HASH: String = '091525b';
 
   WASPLIB_PLUGINS_VERSION: String := ToStr(WL_PLUGINS_VERSION_YEAR) + '.' +
                              PadL(ToStr(WL_PLUGINS_VERSION_MONTH), 2, '0') + '.' +
