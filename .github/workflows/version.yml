@@ -91,7 +91,7 @@ jobs:
             -H "Content-Profile: scripts" \
             -d "$DATA"
             
-       - name: Discord notification
+      - name: Discord notification
         shell: bash
         run: |
             BODY=$(jq -nc \
